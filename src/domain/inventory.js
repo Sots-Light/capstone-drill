@@ -1,6 +1,8 @@
 import { DomainError } from "./errors.js";
 import { newId, newReference } from "./ids.js";
 import { Queue } from "./waitlistQueue.js";
+import { summarizeEvent } from "./eventSearch.js";
+import { parseIsoDate } from "./dates.js";
 
 export const MAX_TICKETS_PER_BOOKING = 10;
 const HOLDS_SEATS = new Set(["pending", "paid"]);
@@ -37,10 +39,7 @@ function requireHolderNames(holderNames) {
 }
 
 export function createEvent(store, { title, city, venue = "", startsAt, organizerId }) {
-  const start = new Date(startsAt);
-  if (typeof startsAt !== "string" || Number.isNaN(start.getTime())) {
-    throw new DomainError("VALIDATION", "startsAt must be a valid date and time");
-  }
+  const start = new Date(parseIsoDate(startsAt, "startsAt"));
   const event = {
     id: newId(),
     organizerId,
@@ -71,6 +70,41 @@ export function addTier(store, eventId, { name, priceInKobo, capacity }) {
   store.waitlists.set(tier.id, new Queue());
   event.tierIds.push(tier.id);
   return tier;
+}
+
+function getEvent(store, eventId) {
+  const event = store.events.get(eventId);
+  if (!event) throw new DomainError("NOT_FOUND", "Event not found");
+  return event;
+}
+
+export function publishEvent(store, eventId) {
+  const event = getEvent(store, eventId);
+  if (event.tierIds.length === 0) {
+    throw new DomainError("INVALID_STATE", "Add at least one ticket tier before publishing");
+  }
+  event.status = "published";
+  return event;
+}
+
+export function unpublishEvent(store, eventId) {
+  const event = getEvent(store, eventId);
+  event.status = "draft";
+  return event;
+}
+
+export function listEventSummaries(store, options = {}) {
+  if (options === null || typeof options !== "object" || Array.isArray(options)) {
+    throw new DomainError("VALIDATION", "Options must be an object");
+  }
+  const { publishedOnly = true } = options;
+  if (typeof publishedOnly !== "boolean") {
+    throw new DomainError("VALIDATION", "publishedOnly must be a boolean");
+  }
+
+  return [...store.events.values()]
+    .filter((event) => !publishedOnly || event.status === "published")
+    .map((event) => summarizeEvent(event, event.tierIds.map((id) => store.tiers.get(id))));
 }
 
 export function seatsLeft(tier) {
