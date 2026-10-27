@@ -1,4 +1,4 @@
-# Build 3 architecture and state diagrams
+# Build 3 and 4 architecture and state diagrams
 
 ## Application layers
 
@@ -12,11 +12,11 @@ flowchart TD
 ```
 
 - **Routes** may read HTTP input, call services, and format HTTP responses; they may not contain booking rules or access storage directly.
-- **Services** may coordinate use cases and repositories; they may not decide domain rules themselves or depend on HTTP response objects.
-- **Domain rules** may validate and decide business state changes; they may not perform HTTP, file, or database I/O.
+- **Services** coordinate use cases and repositories, enforce ownership and application rules, and reuse domain rules; they may not depend on HTTP response objects.
+- **Domain rules** validate inputs and decide allowed business state changes; they may not perform HTTP, file, or database I/O.
 - **Repositories** may read and write data; they may not decide business rules or call routes.
 
-Build 3 introduces the router and server skeleton. The service and repository layers are architectural destinations for later builds, not implementations added in this build.
+Build 3 introduced the router and server skeleton. Build 4 adds the services and in-memory repository behind the routes.
 
 ## HTTP request and data flow
 
@@ -35,33 +35,40 @@ flowchart LR
   Public -->|"file contents"| Static
   Static -->|"200 file response"| App
 
-  Router -->|"/api/*"| Api{"API route registered?"}
-  Api -->|"No: Build 3 has no business API routes yet"| NotFound["JSON 404<br/>NOT_FOUND"]
-  Api -->|"Yes: future Build 4 routes"| Future["Future services<br/>and repositories"]
-  Future -.->|"business rules"| Domain["Domain rules<br/>booking and ticket state machines"]
-  Future -.->|"data access in later builds"| Store[("In-memory store now<br/>SQLite repository in Build 5")]
-  Domain -.->|"allowed state change"| Future
-  Store -.->|"data result"| Future
-  Future -->|"JSON response"| App
+  Router -->|"POST /api/events<br/>tiers, publish, unpublish"| EventRoutes["Event API routes"]
+  Router -->|"GET /api/events"| SearchRoute["Event search route"]
+  Router -->|"POST /api/bookings<br/>pay, refund ticket, cancel"| BookingRoutes["Booking API routes"]
+  Router -->|"unknown /api path"| NotFound["JSON 404<br/>NOT_FOUND"]
+  EventRoutes --> EventService["Event service"]
+  SearchRoute --> EventService
+  BookingRoutes --> BookingService["Booking service"]
+  EventService -->|"validate and apply event rules"| Domain["Domain rules<br/>search, sorting, state machine"]
+  BookingService -->|"validate booking transitions"| Domain
+  EventService --> Repository["Async memory repository"]
+  BookingService --> Repository
+  Repository --> Store[("In-memory events,<br/>tiers, bookings and tickets")]
+  BookingService -->|"charge or refund amount in kobo"| Gateway["Mock payment gateway<br/>simulated only; no card data"]
+  Gateway -->|"approved or declined"| BookingService
+  BookingService -->|"JSON booking response"| App
+  EventService -->|"JSON event response"| App
 
   App -->|"malformed JSON"| BadRequest["JSON 400<br/>BAD_JSON"]
-  NotFound -->|"error response"| App
   BadRequest -->|"error response"| App
   App -->|"2. HTTP response"| Client
 
   classDef client fill:#dae8fc,stroke:#6c8ebf,color:#000;
   classDef server fill:#d5e8d4,stroke:#82b366,color:#000;
   classDef route fill:#fff2cc,stroke:#d6b656,color:#000;
-  classDef future fill:#e1d5e7,stroke:#9673a6,color:#000;
+  classDef serviceLayer fill:#e1d5e7,stroke:#9673a6,color:#000;
   classDef error fill:#f8cecc,stroke:#b85450,color:#000;
   class Client client;
   class Node,App server;
-  class Router,Health,Static,Public,Api route;
-  class Future,Domain,Store future;
-  class NotFound,BadRequest error;
+  class Router,Health,Static,Public,EventRoutes,SearchRoute,BookingRoutes route;
+  class EventService,BookingService,Domain,Repository,Store,Gateway serviceLayer;
+  class BadRequest,NotFound error;
 ```
 
-Solid arrows show behavior implemented in Build 3. Dashed arrows show connections planned for later builds. The client can be your browser on the same computer during development; this does not require a separate Windows Server machine.
+Solid arrows show behavior implemented in Builds 3 and 4. The later SQLite repository is planned for Build 5. The client can be your browser on the same computer during development; this does not require a separate Windows Server machine.
 
 ## Data model
 
@@ -101,9 +108,13 @@ erDiagram
     string tierId
     string status
     integer amountInKobo
+    string createdAt
+    string paidAt
   }
   TICKET {
     string id
+    string firstName
+    string lastName
     string holderName
     integer priceInKobo
     string status
@@ -121,7 +132,7 @@ stateDiagram-v2
     pending --> paid
     pending --> cancelled
     paid --> checked_in: all non-refunded tickets checked in
-    paid --> refunded: full booking refund
+    paid --> refunded: all tickets refunded
     paid --> cancelled
   }
   state "Ticket lifecycle (each ticket has its own ID)" as Ticket {
@@ -136,6 +147,6 @@ stateDiagram-v2
 - A ticket moves from `valid` to `refunded`, `cancelled`, or `checked_in`; those ticket states are final.
 - Returning one ticket changes only that ticket to `refunded`; the other tickets remain `valid`, and the booking remains `paid` until a full-booking transition occurs.
 - A booking is `checked_in` only after every ticket that has not been refunded is checked in. A scan of one ticket is a ticket-level change, not an immediate booking-level change.
-- Build 3 documents and validates these moves. Payment, partial refunds, actual ticket scanning, and issuing tickets through an API are later-build behavior.
+- Builds 3 and 4 validate these moves. Build 4 pays for the booking total in kobo and supports simulated partial ticket refunds; actual payment refunds and ticket scanning are later-build behavior.
 
-`GET /health` is the only application route in this skeleton. The server runs locally on the development computer and listens on `PORT` (default `3000`); it does not provision or configure a hosting machine.
+The server runs locally on the development computer and listens on `PORT` (default `3000`); it does not provision or configure a hosting machine. Build 4 adds the event and booking API routes while continuing to serve `/health` and static files.
