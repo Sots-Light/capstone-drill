@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   addTier,
   bookTickets,
+  cancelBooking,
   createEvent,
   createStore,
   listEventSummaries,
@@ -159,6 +160,23 @@ describe("Build 2 inventory stories", () => {
     assert.equal(seatsLeft(tier), 1);
     assert.equal(store.bookings.size, 1);
     assert.equal(store.bookingsByReference.size, 1);
+  });
+
+  it("cancelling a booking also marks each of its tickets cancelled", () => {
+    const store = createStore();
+    const event = makeDraft(store);
+    const tier = addTier(store, event.id, {
+      name: "General",
+      priceInKobo: 500000,
+      capacity: 3,
+    });
+    const booking = bookTickets(store, tier.id, "attendee-1", ["Ada Obi", "Tunde Bello"]);
+
+    const cancelled = cancelBooking(store, booking.reference);
+
+    assert.equal(cancelled.status, "cancelled");
+    assert.deepEqual(cancelled.tickets.map((ticket) => ticket.status), ["cancelled", "cancelled"]);
+    assert.equal(seatsLeft(tier), 3);
   });
 
   it("S06: rejects invalid ticket quantities with VALIDATION", () => {

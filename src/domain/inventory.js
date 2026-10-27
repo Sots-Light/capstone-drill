@@ -3,9 +3,14 @@ import { newId, newReference } from "./ids.js";
 import { Queue } from "./waitlistQueue.js";
 import { summarizeEvent } from "./eventSearch.js";
 import { parseIsoDate } from "./dates.js";
+import {
+  assertTicketTransition,
+  assertTransition,
+  transitionBooking,
+  transitionTicket,
+} from "./bookingStateMachine.js";
 
 export const MAX_TICKETS_PER_BOOKING = 10;
-const HOLDS_SEATS = new Set(["pending", "paid"]);
 
 export function createStore() {
   return {
@@ -166,11 +171,12 @@ export function findBookingByReference(store, reference) {
 export function cancelBooking(store, reference) {
   const booking = findBookingByReference(store, reference);
   if (!booking) throw new DomainError("NOT_FOUND", "Booking not found");
-  if (!HOLDS_SEATS.has(booking.status)) {
-    throw new DomainError("INVALID_TRANSITION", `A ${booking.status} booking cannot be cancelled`);
-  }
-  getTier(store, booking.tierId).sold -= booking.tickets.length;
-  booking.status = "cancelled";
+  assertTransition(booking.status, "cancelled");
+  for (const ticket of booking.tickets) assertTicketTransition(ticket.status, "cancelled");
+  const tier = getTier(store, booking.tierId);
+  transitionBooking(booking, "cancelled");
+  for (const ticket of booking.tickets) transitionTicket(ticket, "cancelled");
+  tier.sold -= booking.tickets.length;
   return booking;
 }
 
