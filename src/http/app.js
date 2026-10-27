@@ -29,7 +29,10 @@ function statusForError(error) {
   if (error.code === "VALIDATION" || error.code === "BAD_JSON") return 400;
   if (error.code === "BAD_REQUEST" || error instanceof URIError) return 400;
   if (error.code === "NOT_FOUND") return 404;
+  if (error.code === "FORBIDDEN") return 403;
   if (error.code === "PAYLOAD_TOO_LARGE") return 413;
+  if (error.code === "PAYMENT_DECLINED") return 402;
+  if (error.code === "REFUND_DECLINED") return 402;
   if (error.code === "INVALID_STATE" || error.code === "INVALID_TRANSITION" || error.code === "SOLD_OUT") {
     return 409;
   }
@@ -144,6 +147,7 @@ export function createApp({ publicDir = path.resolve("public"), router = createR
           request,
           params: matched.params,
           pathname: requestUrl.pathname,
+          searchParams: requestUrl.searchParams,
         });
         if (response.writableEnded) return;
         const statusCode = result?.statusCode ?? 200;
