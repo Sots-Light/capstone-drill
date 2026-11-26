@@ -1,4 +1,4 @@
-# Build 4 API examples
+# Build 4-5 API examples
 
 Start the server in the `capstone-drill` project folder:
 
@@ -6,7 +6,7 @@ Start the server in the `capstone-drill` project folder:
 npm start
 ```
 
-Keep that terminal open. Run these examples from another Git Bash terminal. The server stores data in memory, so created events and bookings are lost when you stop it.
+Keep that terminal open. Run these examples from another Git Bash terminal. Build 5 stores data in `data/capstone.sqlite`, so events, bookings, tickets, and refund status survive a server restart. Run `npm run seed` once to add a sample event; it skips seeding when the database already contains events.
 
 The examples use the organizer and attendee IDs as simple identifiers in the `x-user-id` header. They are not real login credentials. Replace `EVENT_ID`, `TIER_ID`, and `BOOKING_REFERENCE` with values returned by earlier requests.
 

@@ -1,4 +1,4 @@
-# Build 3 and 4 architecture and state diagrams
+# Build 3-5 architecture and state diagrams
 
 ## Application layers
 
@@ -8,7 +8,7 @@ flowchart TD
   Routes --> Services[Application services]
   Services --> Rules[Domain rules]
   Services --> Repositories[Repositories and data access]
-  Repositories --> Data[(In-memory store now; SQLite in Build 5)]
+  Repositories --> Data[(SQLite database)]
 ```
 
 - **Routes** may read HTTP input, call services, and format HTTP responses; they may not contain booking rules or access storage directly.
@@ -16,7 +16,7 @@ flowchart TD
 - **Domain rules** validate inputs and decide allowed business state changes; they may not perform HTTP, file, or database I/O.
 - **Repositories** may read and write data; they may not decide business rules or call routes.
 
-Build 3 introduced the router and server skeleton. Build 4 adds the services and in-memory repository behind the routes.
+Build 3 introduced the router and server skeleton. Build 4 added services and a memory repository for API tests. Build 5 uses the SQLite repository for the running server so data survives restarts.
 
 ## HTTP request and data flow
 
@@ -46,7 +46,7 @@ flowchart LR
   BookingService -->|"validate booking transitions"| Domain
   EventService --> Repository["Async memory repository"]
   BookingService --> Repository
-  Repository --> Store[("In-memory events,<br/>tiers, bookings and tickets")]
+  Repository --> Store[("SQLite events,<br/>tiers, bookings and tickets")]
   BookingService -->|"charge or refund amount in kobo"| Gateway["Mock payment gateway<br/>simulated only; no card data"]
   Gateway -->|"approved or declined"| BookingService
   BookingService -->|"JSON booking response"| App
@@ -68,7 +68,7 @@ flowchart LR
   class BadRequest,NotFound error;
 ```
 
-Solid arrows show behavior implemented in Builds 3 and 4. The later SQLite repository is planned for Build 5. The client can be your browser on the same computer during development; this does not require a separate Windows Server machine.
+Solid arrows show behavior implemented in Builds 3–5. The running server uses SQLite; API tests may inject an in-memory repository. The client can be your browser on the same computer during development; this does not require a separate Windows Server machine.
 
 ## Data model
 
@@ -108,20 +108,25 @@ erDiagram
     string tierId
     string status
     integer amountInKobo
+    integer refundedAmountInKobo
     string createdAt
     string paidAt
   }
   TICKET {
     string id
+    string bookingId
     string firstName
     string lastName
     string holderName
     integer priceInKobo
     string status
+    string issuedAt
+    string usedAt
+    string refundedAt
   }
 ```
 
-Each booking contains separately identified tickets. The current in-memory project stores users as IDs rather than full user records; authentication and user storage arrive in Build 7.
+Each booking contains separately identified tickets. SQLite persists user IDs and ticket records, including individual refund status. Authentication and full user profiles arrive in Build 7.
 
 ## Booking and ticket life cycles
 
@@ -147,6 +152,6 @@ stateDiagram-v2
 - A ticket moves from `valid` to `refunded`, `cancelled`, or `checked_in`; those ticket states are final.
 - Returning one ticket changes only that ticket to `refunded`; the other tickets remain `valid`, and the booking remains `paid` until a full-booking transition occurs.
 - A booking is `checked_in` only after every ticket that has not been refunded is checked in. A scan of one ticket is a ticket-level change, not an immediate booking-level change.
-- Builds 3 and 4 validate these moves. Build 4 pays for the booking total in kobo and supports simulated partial ticket refunds; actual payment refunds and ticket scanning are later-build behavior.
+- Builds 3–5 validate these moves. Build 4 pays for the booking total in kobo and supports simulated partial ticket refunds; Build 5 persists these records and reserves capacity with a conditional atomic database update. Actual payment refunds and ticket scanning are later-build behavior.
 
 The server runs locally on the development computer and listens on `PORT` (default `3000`); it does not provision or configure a hosting machine. Build 4 adds the event and booking API routes while continuing to serve `/health` and static files.
