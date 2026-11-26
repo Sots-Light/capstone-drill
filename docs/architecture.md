@@ -1,4 +1,4 @@
-# Build 3-5 architecture and state diagrams
+# Build 3-6 architecture and state diagrams
 
 ## Application layers
 
@@ -18,6 +18,8 @@ flowchart TD
 
 Build 3 introduced the router and server skeleton. Build 4 added services and a memory repository for API tests. Build 5 uses the SQLite repository for the running server so data survives restarts.
 
+Build 6 adds a browser interface that calls one mock API module. Its mock data remains separate from the server database; Build 7 will replace the mock API's internals with real HTTP requests.
+
 ## HTTP request and data flow
 
 ```mermaid
@@ -26,6 +28,9 @@ flowchart LR
   Config["PORT environment variable<br/>default: 3000"] -.->|"listens on"| Node
   Node --> App["HTTP app<br/>src/http/app.js"]
   App --> Router{"Router<br/>method + path"}
+
+  Browser["Build 6 pages<br/>public/*.html + JS"] --> MockAPI["Browser mock API<br/>public/js/api.js"]
+  MockAPI --> MockData[("Build 6 mock data<br/>public/js/mockData.js")]
 
   Router -->|"GET /health"| Health["Health route"]
   Health -->|"200 JSON<br/>{ status: ok }"| App
@@ -68,7 +73,7 @@ flowchart LR
   class BadRequest,NotFound error;
 ```
 
-Solid arrows show behavior implemented in Builds 3–5. The running server uses SQLite; API tests may inject an in-memory repository. The client can be your browser on the same computer during development; this does not require a separate Windows Server machine.
+Build 6 browser pages call only the mock API module, which reads mock data; it does not call the server or SQLite. Builds 3-5 server behavior continues to use SQLite, while API tests may inject an in-memory repository. The client can be your browser on the same computer during development; this does not require a separate Windows Server machine.
 
 ## Data model
 
