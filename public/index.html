@@ -3,13 +3,71 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Event Ticketing - Build 3</title>
+    <meta name="description" content="Browse events and book named tickets.">
+    <title>Find events | Event Ticketing</title>
+    <link rel="stylesheet" href="/css/styles.css">
   </head>
   <body>
+    <header class="site-header">
+      <a class="brand" href="/">TicketDrill</a>
+      <span class="header-note">Discover something worth showing up for.</span>
+    </header>
     <main>
-      <h1>Event Ticketing</h1>
-      <p>The Build 3 server is running and serving this static page.</p>
-      <p><a href="/health">Check server health</a></p>
+      <section class="intro">
+        <p class="eyebrow">Good times start here</p>
+        <h1>Find your next event</h1>
+        <p class="lead">Search local events, compare ticket tiers, and book for the people coming with you.</p>
+      </section>
+
+      <form id="filters" class="filters panel">
+        <div class="field search-field">
+          <label for="q">Search events</label>
+          <input id="q" name="q" type="search" placeholder="Event or venue">
+        </div>
+        <div class="field">
+          <label for="city">City</label>
+          <select id="city" name="city">
+            <option value="">All cities</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="from">From date</label>
+          <input id="from" name="from" type="date">
+        </div>
+        <div class="field">
+          <label for="to">To date</label>
+          <input id="to" name="to" type="date">
+        </div>
+        <div class="field">
+          <label for="maxPrice">Maximum price (₦)</label>
+          <input id="maxPrice" name="maxPrice" type="number" min="0" step="1" inputmode="numeric" placeholder="Any price">
+        </div>
+        <div class="field">
+          <label for="sort">Sort by</label>
+          <select id="sort" name="sort">
+            <option value="date">Date</option>
+            <option value="price">Lowest price</option>
+            <option value="availability">Most seats</option>
+          </select>
+        </div>
+        <label class="check-field" for="onlyAvailable">
+          <input id="onlyAvailable" name="onlyAvailable" type="checkbox">
+          <span>Available tickets only</span>
+        </label>
+        <button type="submit" class="button button-primary">Find events</button>
+      </form>
+
+      <section aria-labelledby="results-heading">
+        <div class="section-heading">
+          <h2 id="results-heading">Upcoming events</h2>
+          <p id="status" role="status" aria-live="polite" class="status">Loading events…</p>
+        </div>
+        <ul id="events" class="event-grid"></ul>
+      </section>
     </main>
+    <footer class="site-footer">
+      <p>Build 6 learning demo · Payments are simulated · No real payment details are collected</p>
+    </footer>
+    <script type="module" src="/js/pages/home.js"></script>
   </body>
 </html>
