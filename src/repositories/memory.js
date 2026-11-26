@@ -40,5 +40,21 @@ export function createMemoryRepository() {
     async getBookingByReference(reference) {
       return bookingsByReference.get(reference);
     },
+
+    async saveBookingWithSeatReservation(booking, quantity) {
+      const tier = tiers.get(booking.tierId);
+      if (!tier || tier.sold + quantity > tier.capacity) return false;
+      tier.sold += quantity;
+      bookings.set(booking.id, booking);
+      bookingsByReference.set(booking.reference, booking);
+      return true;
+    },
+
+    async releaseSeats(tierId, quantity) {
+      const tier = tiers.get(tierId);
+      if (!tier || tier.sold < quantity) return false;
+      tier.sold -= quantity;
+      return true;
+    },
   };
 }

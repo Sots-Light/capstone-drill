@@ -54,15 +54,6 @@ export function createBookingService(repository, paymentGateway) {
         throw new DomainError("INVALID_STATE", "Tickets can only be booked for published events");
       }
 
-      const seatsLeft = tier.capacity - tier.sold;
-      if (seatsLeft < attendees.length) {
-        throw new DomainError(
-          "SOLD_OUT",
-          seatsLeft === 0 ? `${tier.name} is sold out` : `Only ${seatsLeft} ticket(s) left in ${tier.name}`,
-          { seatsLeft },
-        );
-      }
-
       const amountInKobo = tier.priceInKobo * attendees.length;
       if (!Number.isSafeInteger(amountInKobo)) {
         throw new DomainError("VALIDATION", "Booking total must be a whole number of kobo");
@@ -95,9 +86,9 @@ export function createBookingService(repository, paymentGateway) {
         })),
       };
 
-      tier.sold += attendees.length;
-      await repository.saveTier(tier);
-      return repository.saveBooking(booking);
+      const reserved = await repository.saveBookingWithSeatReservation(booking, attendees.length);
+      if (!reserved) throw new DomainError("SOLD_OUT", `${tier.name} does not have enough seats`);
+      return booking;
     },
 
     async payForBooking(attendeeId, reference) {
@@ -152,15 +143,15 @@ export function createBookingService(repository, paymentGateway) {
         throw new DomainError("REFUND_DECLINED", "Mock refund was declined");
       }
 
+      const released = await repository.releaseSeats(tier.id, 1);
+      if (!released) throw new DomainError("INVALID_STATE", "Could not release the refunded ticket seat");
       transitionTicket(ticket, "refunded");
       ticket.refundedAt = new Date().toISOString();
       booking.refundedAmountInKobo = (booking.refundedAmountInKobo ?? 0) + ticket.priceInKobo;
-      tier.sold -= 1;
       if (booking.tickets.every((item) => item.status === "refunded")) {
         transitionBooking(booking, "refunded");
       }
 
-      await repository.saveTier(tier);
       return repository.saveBooking(booking);
     },
 
@@ -179,10 +170,10 @@ export function createBookingService(repository, paymentGateway) {
 
       const tier = await repository.getTier(booking.tierId);
       if (!tier) throw new DomainError("NOT_FOUND", "Ticket tier not found");
+      const released = await repository.releaseSeats(tier.id, booking.tickets.length);
+      if (!released) throw new DomainError("INVALID_STATE", "Could not release the cancelled booking seats");
       transitionBooking(booking, "cancelled");
       for (const ticket of booking.tickets) transitionTicket(ticket, "cancelled");
-      tier.sold -= booking.tickets.length;
-      await repository.saveTier(tier);
       return repository.saveBooking(booking);
     },
   };
